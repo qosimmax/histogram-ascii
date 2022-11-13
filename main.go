@@ -96,20 +96,17 @@ func asciiCounter(done <-chan struct{}, paths <-chan string, c chan<- Row) {
 	for path := range paths {
 		func(path string) {
 			out, errc := fileRead(path)
-			for {
+			for o := range out {
 				select {
-				case o, ok := <-out:
-					if !ok {
-						return
-					}
-					c <- Row{buf: o}
+				case c <- Row{buf: o}:
 				case err := <-errc:
 					c <- Row{err: err}
-					return
 				case <-done:
 					return
+
 				}
 			}
+
 		}(path)
 	}
 
@@ -159,7 +156,6 @@ func HistogramASCII(root string, numWorkers int) (map[byte]int, error) {
 }
 
 func main() {
-
 	result, err := HistogramASCII(os.Args[1], runtime.NumCPU())
 	if err != nil {
 		panic(err)
