@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -14,6 +15,11 @@ import (
 const (
 	bufSize = 1024
 )
+
+type Row struct {
+	err error
+	buf []byte
+}
 
 func walkFiles(done <-chan struct{}, root string) (<-chan string, <-chan error) {
 	paths := make(chan string)
@@ -86,7 +92,7 @@ func fileRead(path string) (<-chan []byte, <-chan error) {
 	return out, errc
 }
 
-func asciiCounter(done <-chan struct{}, paths <-chan string, c chan<- []byte) {
+func asciiCounter(done <-chan struct{}, paths <-chan string, c chan<- Row) {
 	for path := range paths {
 		func(path string) {
 			out, errc := fileRead(path)
@@ -96,9 +102,9 @@ func asciiCounter(done <-chan struct{}, paths <-chan string, c chan<- []byte) {
 					if !ok {
 						return
 					}
-					c <- o
+					c <- Row{buf: o}
 				case err := <-errc:
-					fmt.Println(err)
+					c <- Row{err: err}
 					return
 				case <-done:
 					return
@@ -114,7 +120,7 @@ func HistogramASCII(root string, numWorkers int) (map[byte]int, error) {
 	defer close(done)
 
 	paths, errc := walkFiles(done, root)
-	c := make(chan []byte)
+	c := make(chan Row)
 	var wg sync.WaitGroup
 
 	wg.Add(numWorkers)
@@ -135,7 +141,12 @@ func HistogramASCII(root string, numWorkers int) (map[byte]int, error) {
 	}
 
 	for r := range c {
-		for _, ch := range r {
+		if r.err != nil {
+			log.Println(r.err)
+			continue
+		}
+
+		for _, ch := range r.buf {
 			ascii[ch] += 1
 		}
 	}
