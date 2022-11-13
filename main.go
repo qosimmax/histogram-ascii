@@ -109,11 +109,9 @@ func asciiCounter(done <-chan struct{}, paths <-chan string, c chan<- []byte) {
 
 }
 
-func HistogramASCII(root string) (map[byte]int, error) {
+func HistogramASCII(root string, numWorkers int) (map[byte]int, error) {
 	done := make(chan struct{})
 	defer close(done)
-
-	numWorkers := runtime.NumCPU()
 
 	paths, errc := walkFiles(done, root)
 	c := make(chan []byte)
@@ -151,7 +149,7 @@ func HistogramASCII(root string) (map[byte]int, error) {
 
 func main() {
 
-	result, err := HistogramASCII(os.Args[1])
+	result, err := HistogramASCII(os.Args[1], runtime.NumCPU())
 	if err != nil {
 		panic(err)
 		return
